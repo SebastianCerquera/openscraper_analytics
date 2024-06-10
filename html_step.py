@@ -1,4 +1,12 @@
-from scraping_utils import ElasticArchive
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
+
+from scraping_utils import ElasticArchive, ProccessorBuilder, PreprocessorRunner
+from implementation.default import DefaultBuilder
+
+INDEX_NAME = os.getenv("SIMPLE_TEXT_FROM_HTML_INDEX")
 
 class HTMLAnalyzer(ElasticArchive):
     
@@ -76,4 +84,15 @@ class HTMLAnalyzer(ElasticArchive):
                  }
                }
              }
-        }
+          }
+    
+if __name__ == '__main__':
+  post_builder = ProccessorBuilder()
+  post_builder.add_processor('default', DefaultBuilder())
+
+  archive = HTMLAnalyzer(os.getenv("OPENSEARCH_ENDPOINT"), INDEX_NAME)
+
+  runner = PreprocessorRunner(os.getenv("TAR_FOLDER"), post_builder, archive)
+  errors, tar_errors = runner.process()
+  
+    

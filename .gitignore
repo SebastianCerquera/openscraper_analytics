@@ -1,2 +1,5 @@
 scraping/*
 .env
+implementation/*
+__pycache__/*
+terms_table.json

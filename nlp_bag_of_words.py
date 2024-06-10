@@ -7,11 +7,11 @@ load_dotenv()
 import pandas as pd
 from opensearchpy import OpenSearch
 
-index_name = 'html-extracted-text'
+index_name = os.getenv("SIMPLE_TEXT_FROM_HTML_INDEX")
 endpoint = os.getenv("OPENSEARCH_ENDPOINT")
 opensearch = OpenSearch(endpoint, verify_certs=False)
 
-raw_results = opensearch.search(index=index_name, body={"size": 50000, "query": {"match_all": {}}})
+raw_results = opensearch.search(index=index_name, body={"size": 10000, "query": {"match_all": {}}})
 doc_ids = list(map(lambda e: e["_id"], raw_results['hits']['hits']))
 
 term_vectors_flat = list(map(lambda e: opensearch.termvectors(index=index_name, id=e), doc_ids))
