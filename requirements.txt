@@ -1,0 +1,6 @@
+bs4==0.0.2
+opensearch-py==2.5.0
+beautifulsoup4==4.12.3
+jupyter==1.0.0
+jupytext==1.16.2
+python-dotenv==1.0.1
