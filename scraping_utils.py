@@ -1,3 +1,4 @@
+import pandas as pd
 
 from bs4 import BeautifulSoup                                                                                                                                                                
 from abc import ABC, abstractmethod
@@ -16,17 +17,14 @@ class Post(ABC):
         self.path = path
         self.body = body
 
-    @abstractmethod
     def extract_page_body(self):
-        pass
-        
-    @abstractmethod
+        return self.body
+
     def extract_url(self):
-        pass
-    
-    @abstractmethod
+        return self.url
+
     def get_cached_path(self):
-        pass
+        return self.path
     
     ## TODO it is still missing to add the images, I will need to improve the design
     def to_json(self):
@@ -35,7 +33,7 @@ class Post(ABC):
             'url': self.extract_url(),
             'path': self.get_cached_path()
         }
-
+    
 
 class PostBuilder(ABC):
     
@@ -101,6 +99,37 @@ class ElasticArchive(ABC):
         ## TODO add validation to the response
         self.elasticsearch.index(index=self.index_name, body=post.to_json())
 
+    def build_bag_of_words(self):
+        raw_results = self.elasticsearch.search(
+            index=self.index_name, body={"size": 10000, "query": {"match_all": {}}})
+        
+        doc_ids = list(map(lambda e: e["_id"], raw_results['hits']['hits']))
+        
+        term_vectors_flat = list(map(
+            lambda e: self.elasticsearch.termvectors(index=self.index_name, id=e), doc_ids))
+        terms_flat = list(
+            map(
+                lambda e: e['term_vectors']['body']['terms'] if 'body' in e['term_vectors'] else {}, 
+                term_vectors_flat
+                )
+            )
+        
+        corpus_terms = {}
+        for terms in terms_flat:
+            for term in terms.keys():
+                corpus_terms[term] = corpus_terms[term] + terms[term]['term_freq'] if term in corpus_terms else terms[term]['term_freq']
+        
+        return pd.DataFrame(corpus_terms.items(), columns=["terms", "count"])
+
+    def apply_to_index(self, target_archive):
+        raw_results = self.elasticsearch.search(
+            index=self.index_name, body={"size": 10000, "query": {"match_all": {}}})
+
+        for doc in raw_results['hits']['hits']:
+            post = Post(doc['_source']['url'], doc['_source']['path'], doc['_source']['body'])
+            target_archive.save_post(post)
+
+    
 
 class PreprocessorRunner(ABC):
     
@@ -137,3 +166,82 @@ class PreprocessorRunner(ABC):
             except Exception as ex:
                 tar_errors.append(tar_path)
         return errors, tar_errors
+    
+
+class HTMLAnalyzer(ElasticArchive):
+    
+    def default_settings(self):
+        return  {
+           "settings": {
+               "index": {
+                 "number_of_shards": "1",
+                 "analysis": {
+                   "filter": {
+                     "english_stop": {
+                       "type":       "stop",
+                       "stopwords":  "_english_" 
+                     },
+                     "spanish_stop": {
+                       "type":       "stop",
+                       "stopwords":  "_spanish_" 
+                     }
+                   },
+                   "analyzer": {
+                     "ma": {
+                       "tokenizer": "mt",
+                       "filter": [
+                         "english_stop",
+                         "spanish_stop"
+                       ],
+                       "char_filter": [
+                          "html_strip"
+                        ]
+                     }
+                   },
+                   "tokenizer": {
+                     "mt": {
+                       "type": "char_group",
+                       "tokenize_on_chars": [
+                         "whitespace",
+                         "\n"
+                       ]
+                     }
+                   }
+                 },
+                 "number_of_replicas": "1"
+               }
+             },
+           "mappings": {
+               "properties": {
+                 "url": {
+                   "type": "text",
+                   "fields": {
+                     "keyword": {
+                       "type": "keyword",
+                       "ignore_above": 256
+                     }
+                   }
+                 },
+                 "path": {
+                   "type": "text",
+                   "fields": {
+                     "keyword": {
+                       "type": "keyword",
+                       "ignore_above": 256
+                     }
+                   }
+                 },
+                 "body": {
+                   "type": "text",
+                   "term_vector": "yes",
+                   "analyzer" : "ma",
+                   "fields": {
+                     "keyword": {
+                       "type": "keyword",
+                       "ignore_above": 256
+                     }
+                   }
+                 }
+               }
+             }
+          }
