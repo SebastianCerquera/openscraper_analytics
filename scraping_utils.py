@@ -121,13 +121,16 @@ class ElasticArchive(ABC):
         
         return pd.DataFrame(corpus_terms.items(), columns=["terms", "count"])
 
-    def apply_to_index(self, target_archive):
+    def apply_to_index(self, target_archive, query={"match_all": {}}):
         raw_results = self.elasticsearch.search(
-            index=self.index_name, body={"size": 10000, "query": {"match_all": {}}})
+            index=self.index_name, body={"size": 10000, "query": query})
 
         for doc in raw_results['hits']['hits']:
             post = Post(doc['_source']['url'], doc['_source']['path'], doc['_source']['body'])
             target_archive.save_post(post)
+
+    def initial_step(self):
+        self
 
     
 
@@ -188,7 +191,7 @@ class HTMLAnalyzer(ElasticArchive):
                    },
                    "analyzer": {
                      "ma": {
-                       "tokenizer": "mt",
+                       "tokenizer": "whitespace",
                        "filter": [
                          "english_stop",
                          "spanish_stop"
@@ -196,15 +199,6 @@ class HTMLAnalyzer(ElasticArchive):
                        "char_filter": [
                           "html_strip"
                         ]
-                     }
-                   },
-                   "tokenizer": {
-                     "mt": {
-                       "type": "char_group",
-                       "tokenize_on_chars": [
-                         "whitespace",
-                         "\n"
-                       ]
                      }
                    }
                  },
