@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-from scraping_utils import ProccessorBuilder, PreprocessorRunner, HTMLAnalyzer
+from scraping_utils import ProccessorBuilder, PreprocessorRunner
 from implementation.default_html import DefaultBuilder
 from implementation.default_fixed_filter import ComposedAnalyzer
 

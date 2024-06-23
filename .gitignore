@@ -4,3 +4,4 @@ implementation/*
 __pycache__/*
 terms_table.json
 text_terms_table.json
+jupyter_analysis/*
