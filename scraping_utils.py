@@ -88,6 +88,39 @@ class ElasticArchive(ABC):
     def default_settings(self):
         pass
     
+    def common_mappings(self):
+        return  {
+           "properties": {
+             "url": {
+               "type": "text",
+               "fields": {
+                 "keyword": {
+                   "type": "keyword",
+                   "ignore_above": 256
+                 }
+               }
+             },
+             "path": {
+               "type": "text",
+               "fields": {
+                 "keyword": {
+                   "type": "keyword",
+                   "ignore_above": 256
+                 }
+               }
+             },
+             "body": {
+               "type": "text",
+               "fields": {
+                 "keyword": {
+                   "type": "keyword",
+                   "ignore_above": 256
+                 }
+               }
+             }
+           }
+        }
+    
     def __init__(self, endpoint, index_name):
         self.index_name = index_name
         self.elasticsearch = OpenSearch(endpoint, verify_certs=False)
@@ -179,6 +212,49 @@ class HTMLAnalyzer(ElasticArchive):
                "index": {
                  "number_of_shards": "1",
                  "analysis": {
+                   "analyzer": {
+                     "ma": {
+                       "tokenizer": "whitespace",
+                       "char_filter": [
+                          "html_strip"
+                        ]
+                     }
+                   }
+                 },
+                 "number_of_replicas": "1"
+               }
+             },
+           "mappings": super().common_mappings()
+          }
+    
+class DefaultAnalyzer(ElasticArchive):
+    
+    def default_settings(self):
+        return  {
+           "settings": {
+               "index": {
+                 "number_of_shards": "1",
+                 "analysis": {
+                   "analyzer": {
+                     "ma": {
+                       "tokenizer": "whitespace",
+                     }
+                   }
+                 },
+                 "number_of_replicas": "1"
+               }
+             },
+           "mappings": super().common_mappings()
+          }
+    
+class SimpleTextAnalyzer(ElasticArchive):
+    
+    def default_settings(self):
+        default_settings = {
+           "settings": {
+               "index": {
+                 "number_of_shards": "1",
+                 "analysis": {
                    "filter": {
                      "english_stop": {
                        "type":       "stop",
@@ -195,47 +271,25 @@ class HTMLAnalyzer(ElasticArchive):
                        "filter": [
                          "english_stop",
                          "spanish_stop"
-                       ],
-                       "char_filter": [
-                          "html_strip"
-                        ]
+                       ]
                      }
                    }
                  },
                  "number_of_replicas": "1"
                }
              },
-           "mappings": {
-               "properties": {
-                 "url": {
-                   "type": "text",
-                   "fields": {
-                     "keyword": {
-                       "type": "keyword",
-                       "ignore_above": 256
-                     }
-                   }
-                 },
-                 "path": {
-                   "type": "text",
-                   "fields": {
-                     "keyword": {
-                       "type": "keyword",
-                       "ignore_above": 256
-                     }
-                   }
-                 },
-                 "body": {
-                   "type": "text",
-                   "term_vector": "yes",
-                   "analyzer" : "ma",
-                   "fields": {
-                     "keyword": {
-                       "type": "keyword",
-                       "ignore_above": 256
-                     }
-                   }
-                 }
-               }
-             }
+           "mappings": super().common_mappings()
           }
+    
+        analyzer_settings = {
+            "term_vector": "yes",
+            "analyzer" : "ma" 
+        }
+
+        mappings = super().common_mappings()
+        body_field = mappings["properties"]["body"]
+        mappings["properties"]["body"] = body_field | analyzer_settings
+
+        default_settings["mappings"] = mappings
+
+        return default_settings
